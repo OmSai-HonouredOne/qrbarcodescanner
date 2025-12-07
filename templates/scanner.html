@@ -5,7 +5,7 @@
     <title>QR / Barcode Scanner</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- QR Scanner Library -->
+    <!-- QR / Barcode Scanner Library -->
     <script src="https://unpkg.com/html5-qrcode"></script>
 
     <style>
@@ -17,27 +17,51 @@
         }
         #reader {
             width: 100%;
-            max-width: 350px;
+            max-width: 380px;
             margin: 20px auto;
             border: 2px solid #3b82f6;
             border-radius: 10px;
             padding: 10px;
+            background-color: #000;
         }
         .result {
-            margin-top: 15px;
+            margin-top: 12px;
             font-size: 18px;
             color: #60a5fa;
+        }
+        .btn {
+            margin: 10px 6px;
+            padding: 10px 18px;
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background-color: #1d4ed8;
         }
     </style>
 </head>
 <body>
 
-    <h2>Scan QR / Barcode</h2>
+    <h2>QR / Barcode Scanner</h2>
+
     <div id="reader"></div>
+
+    <div>
+        <button class="btn" onclick="toggleCamera()">Switch Camera</button>
+    </div>
+
     <div class="result" id="result">Waiting for scan...</div>
 
     <script>
         const resultDiv = document.getElementById("result");
+        const html5QrCode = new Html5Qrcode("reader");
+
+        let cameras = [];
+        let currentIndex = 0;
 
         function onScanSuccess(decodedText) {
             resultDiv.innerText = "Scanned: " + decodedText;
@@ -45,41 +69,57 @@
             // Send scanned code to Flask backend
             fetch('/scan', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code: decodedText })
-            })
-            .then(res => res.json())
-            .then(data => {
-                console.log("Server response:", data);
             });
 
-            // Stop scanning after first success (optional)
+            // Stop scanning after successful scan
             html5QrCode.stop();
         }
 
         function onScanFailure(error) {
-            // Ignore scan errors
+            // ignore frame decode errors
         }
 
-        const html5QrCode = new Html5Qrcode("reader");
+        function startCameraById(cameraId) {
+            html5QrCode.start(
+                cameraId,
+                { fps: 10, qrbox: 250 },
+                onScanSuccess,
+                onScanFailure
+            );
+        }
 
-        Html5Qrcode.getCameras().then(devices => {
-            if (devices && devices.length) {
-                html5QrCode.start(
-                    devices[0].id,
-                    {
-                        fps: 10,
-                        qrbox: 250
-                    },
-                    onScanSuccess,
-                    onScanFailure
-                );
+        function loadCameras() {
+            Html5Qrcode.getCameras().then(devices => {
+                cameras = devices;
+
+                if (!cameras || cameras.length === 0) {
+                    resultDiv.innerText = "No camera found!";
+                    return;
+                }
+
+                startCameraById(cameras[currentIndex].id);
+            }).catch(err => {
+                resultDiv.innerText = "Camera error: " + err;
+            });
+        }
+
+        function toggleCamera() {
+            if (cameras.length <= 1) {
+                resultDiv.innerText = "Only one camera available";
+                return;
             }
-        }).catch(err => {
-            console.error("Camera error:", err);
-        });
+
+            currentIndex = (currentIndex + 1) % cameras.length;
+
+            html5QrCode.stop().then(() => {
+                startCameraById(cameras[currentIndex].id);
+            });
+        }
+
+        // Auto start
+        loadCameras();
     </script>
 
 </body>
