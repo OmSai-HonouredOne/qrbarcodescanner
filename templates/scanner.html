@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>QR / Barcode Scanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- QR Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <style>
+        body {
+            background: #0b0f19;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        #reader {
+            width: 100%;
+            max-width: 350px;
+            margin: 20px auto;
+            border: 2px solid #3b82f6;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .result {
+            margin-top: 15px;
+            font-size: 18px;
+            color: #60a5fa;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Scan QR / Barcode</h2>
+    <div id="reader"></div>
+    <div class="result" id="result">Waiting for scan...</div>
+
+    <script>
+        const resultDiv = document.getElementById("result");
+
+        function onScanSuccess(decodedText) {
+            resultDiv.innerText = "Scanned: " + decodedText;
+
+            // Send scanned code to Flask backend
+            fetch('/scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ code: decodedText })
+            })
+            .then(res => res.json())
+            .then(data => {
+                console.log("Server response:", data);
+            });
+
+            // Stop scanning after first success (optional)
+            html5QrCode.stop();
+        }
+
+        function onScanFailure(error) {
+            // Ignore scan errors
+        }
+
+        const html5QrCode = new Html5Qrcode("reader");
+
+        Html5Qrcode.getCameras().then(devices => {
+            if (devices && devices.length) {
+                html5QrCode.start(
+                    devices[0].id,
+                    {
+                        fps: 10,
+                        qrbox: 250
+                    },
+                    onScanSuccess,
+                    onScanFailure
+                );
+            }
+        }).catch(err => {
+            console.error("Camera error:", err);
+        });
+    </script>
+
+</body>
+</html>
